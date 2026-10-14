@@ -24,7 +24,8 @@ import av
 LICENSE = "LGPL version 2.1 or later"
 LIBRARIES = ("avcodec", "avdevice", "avfilter", "avformat", "avutil", "swresample", "swscale")
 BUNDLED = re.compile(
-    r"^(lib)?(avcodec|avdevice|avfilter|avformat|avutil|swresample|swscale|dav1d|z|zlib1)([-.]|$)", re.I
+    r"^(lib)?(avcodec|avdevice|avfilter|avformat|avutil|swresample|swscale|dav1d|z|zlib1)"
+    r"(-[0-9a-f]{8,})?((\.\d+)*\.dylib|\.so(\.\d+)*|(-\d+)?(-[0-9a-f]{32})?\.dll)$", re.I
 )
 DECODERS = ("h264", "hevc", "vp9", "libdav1d", "aac", "mp3float", "opus")
 MUXERS = ("mp4", "mov", "webm", "matroska")
