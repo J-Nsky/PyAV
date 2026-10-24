@@ -1,1 +1,1 @@
-__version__ = "18.1.0+lgpl1"
+__version__ = "18.1.0+lgpl2"

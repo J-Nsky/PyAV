@@ -28,7 +28,9 @@ BUNDLED = re.compile(
     r"(-[0-9a-f]{8,})?((\.\d+)*\.dylib|\.so(\.\d+)*|(-\d+)?(-[0-9a-f]{32})?\.dll)$", re.I
 )
 DECODERS = ("h264", "hevc", "vp9", "libdav1d", "aac", "mp3float", "opus")
-MUXERS = ("mp4", "mov", "webm", "matroska")
+# lgpl2: the allow-list build (MyDancingBook tools/ffmpeg/allowlist.json) has exactly the
+# three muxers the app's share cut writes; "matroska" is a demuxer name there, not a muxer.
+MUXERS = ("mp4", "mov", "webm")
 MATRIX = os.path.join(os.path.dirname(os.path.abspath(__file__)), "lgpl-matrix")
 REMUX_FORMATS = {".mp4": "mp4", ".mov": "mov", ".webm": "webm"}
 
