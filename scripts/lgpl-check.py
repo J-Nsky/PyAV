@@ -5,7 +5,7 @@ which encode with libx264).
    no --enable-gpl / nonfree / version3, the only --enable-lib* is libdav1d, no
    encoder at all, and the libraries bundled into the wheel are only FFmpeg's
    seven, dav1d and zlib.
-2. What My Dancing Book needs: open, decode, resample (as faster-whisper's
+2. What MyDancingBook needs: open, decode, resample (as faster-whisper's
    decode_audio does) and stream-copy remux of the synthetic clips in
    scripts/lgpl-matrix/.
 
@@ -93,7 +93,7 @@ def licence_guard() -> None:
 
 
 def remux(src: str, fmt: str, dst: str) -> None:
-    """Stream copy as My Dancing Book's share export does (no encoder lookup)."""
+    """Stream copy as MyDancingBook's share export does (no encoder lookup)."""
     with av.open(src) as inp:
         keep = [s for s in inp.streams if s.type in ("video", "audio")]
         with av.open(dst, "w", format=fmt, options={"fflags": "+bitexact"}) as out:

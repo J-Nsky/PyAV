@@ -1,4 +1,4 @@
-> **This fork (branch `lgpl`) builds PyAV `18.1.0+lgpl1` wheels for My Dancing Book against an
+> **This fork (branch `lgpl`) builds PyAV `18.1.0+lgpl1` wheels for MyDancingBook against an
 > LGPL-2.1-or-later-only FFmpeg 8.1.2** ([J-Nsky/pyav-ffmpeg](https://github.com/J-Nsky/pyav-ffmpeg),
 > release `8.1.2-lgpl1`: dav1d + zlib, no GPL / nonfree / version3 parts, no encoders, no network,
 > no devices; the release carries the sources). Wheels: macOS arm64, manylinux x86_64, Windows
