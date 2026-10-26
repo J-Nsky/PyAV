@@ -1,93 +1,176 @@
 name: tests
+# MyDancingBook lgpl2, WINDOWS ONLY (RC item G4, 2026-10-26; MyDancingBook
+# docs/research/2026-10-26-windows-lgpl2-wheel-packet.md "Fix prepared").
+#
+# The cp311-abi3 win_amd64 wheel of PyAV 18.1.0+lgpl2 against the FFmpeg 9.0.2
+# allow-list build of J-Nsky/pyav-ffmpeg release 9.0.2-lgpl2 (ffmpeg-windows-x86_64.tar.gz,
+# SHA-256 pinned in scripts/ffmpeg-latest.json and checked by scripts/fetch-vendor.py).
+# No cibuildwheel: the build tools are hash-locked (scripts/mdb/build-tools*.txt), the
+# wheel is built with pip --no-index, repaired with delvewheel, installed into Python
+# 3.14.9 (the app's) and checked with the fork's LGPL check AND MyDancingBook's own
+# allow-list checker (scripts/mdb/ffmpeg_allowlist.py --check-pyav). Only a wheel that
+# passes both reaches the publish job, which creates a NEW release (or adds new names
+# to it); it never deletes or replaces an asset. Actions are pinned by full commit SHA.
 on:
   push:
-    branches: lgpl
-  release:
-    types: [published]
+    branches: [win-lgpl2]
   workflow_dispatch:
-jobs:
-  package-source:
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v6
-        with:
-          python-version: "3.14"
-      - name: Build source package
-        run: |
-          pip install -U cython setuptools
-          python scripts/fetch-vendor.py --config-file scripts/ffmpeg-latest.json /tmp/vendor
-          PKG_CONFIG_PATH=/tmp/vendor/lib/pkgconfig python setup.py sdist
-      - name: Upload source package
-        uses: actions/upload-artifact@v6
-        with:
-          name: dist-source
-          path: dist/
 
-  package-wheel:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: macos-14
-            arch: arm64
-          - os: ubuntu-24.04
-            arch: x86_64
-          - os: windows-latest
-            arch: AMD64
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v6
-        with:
-          python-version: "3.14"
-      - name: Set Minimum MacOS Target
-        if: runner.os == 'macOS'
-        run: |
-          echo "MACOSX_DEPLOYMENT_TARGET=14.0" >> $GITHUB_ENV
-      - name: Build wheels
-        env:
-          CIBW_ARCHS: ${{ matrix.arch }}
-          CIBW_BEFORE_BUILD: python scripts/fetch-vendor.py --config-file scripts/ffmpeg-latest.json /tmp/vendor
-          CIBW_BEFORE_BUILD_MACOS: python scripts/fetch-vendor.py --config-file scripts/ffmpeg-latest.json /tmp/vendor
-          CIBW_BEFORE_BUILD_WINDOWS: python scripts\fetch-vendor.py --config-file scripts\ffmpeg-latest.json C:\cibw\vendor
-          CIBW_ENVIRONMENT_LINUX: LD_LIBRARY_PATH=/tmp/vendor/lib:$LD_LIBRARY_PATH PKG_CONFIG_PATH=/tmp/vendor/lib/pkgconfig
-          CIBW_ENVIRONMENT_MACOS: PKG_CONFIG_PATH=/tmp/vendor/lib/pkgconfig LDFLAGS=-headerpad_max_install_names
-          CIBW_ENVIRONMENT_WINDOWS: INCLUDE=C:\\cibw\\vendor\\include LIB=C:\\cibw\\vendor\\lib PYAV_SKIP_TESTS=unicode_filename
-          CIBW_REPAIR_WHEEL_COMMAND_WINDOWS: delvewheel repair --add-path C:\cibw\vendor\bin -w {dest_dir} {wheel}
-          # cp311 = the abi3 wheel (every CPython from 3.11, 3.14 included); manylinux only
-          CIBW_BUILD: "cp311-*"
-          CIBW_SKIP: "*musllinux*"
-          # upstream's tests encode with libx264; this build has no encoders (scripts/lgpl-check.py)
-          CIBW_TEST_COMMAND: python {project}/scripts/lgpl-check.py
-        run: |
-          pip install cibuildwheel delvewheel
-          cibuildwheel --output-dir dist
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-win-lgpl2
+  cancel-in-progress: false
+
+env:
+  RELEASE_TAG: v18.1.0-lgpl2-win
+
+jobs:
+  package-wheel-windows:
+    runs-on: windows-2025
+    timeout-minutes: 60
+    defaults:
+      run:
         shell: bash
-      - name: Upload wheels
-        uses: actions/upload-artifact@v6
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
-          name: dist-${{ matrix.os }}-${{ matrix.arch }}
+          persist-credentials: false
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6.3.0
+        id: py311
+        with:
+          python-version: "3.11.9"
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6.3.0
+        id: py314
+        with:
+          python-version: "3.14.9"
+
+      - name: Pinned copies of MyDancingBook's checker
+        run: sha256sum -c --strict scripts/mdb/inputs.sha256
+
+      - name: Build tools (hash-locked)
+        env:
+          PIP_DISABLE_PIP_VERSION_CHECK: "1"
+          PIP_CONFIG_FILE: "nul"
+        run: |
+          set -euo pipefail
+          PY="$(cygpath -u '${{ steps.py311.outputs.python-path }}')"
+          "$PY" -VV
+          "$PY" -m pip install --require-hashes --only-binary=:all: --no-deps -r scripts/mdb/build-tools.txt
+          "$PY" -m pip install --require-hashes --no-deps --no-build-isolation --no-binary=delvewheel -r scripts/mdb/build-tools-sdist.txt
+          "$PY" -m pip list
+
+      - name: FFmpeg 9.0.2 allow-list build (SHA-256 pinned)
+        run: |
+          set -euo pipefail
+          cat scripts/ffmpeg-latest.json
+          "$(cygpath -u '${{ steps.py311.outputs.python-path }}')" scripts/fetch-vendor.py --config-file scripts/ffmpeg-latest.json 'C:\cibw\vendor'
+          ls -l /c/cibw/vendor/bin
+
+      - name: Build the wheel (no index)
+        env:
+          INCLUDE: C:\cibw\vendor\include
+          LIB: C:\cibw\vendor\lib
+          PIP_DISABLE_PIP_VERSION_CHECK: "1"
+          PIP_CONFIG_FILE: "nul"
+        run: |
+          set -euo pipefail
+          "$(cygpath -u '${{ steps.py311.outputs.python-path }}')" -m pip wheel . --no-deps --no-build-isolation --no-index -w raw
+          ls -l raw
+
+      - name: delvewheel repair
+        run: |
+          set -euo pipefail
+          "$(cygpath -u '${{ steps.py311.outputs.python-path }}')" -m delvewheel repair --add-path 'C:\cibw\vendor\bin' -w dist raw/av-*.whl
+          ls -l dist
+
+      - name: Check the wheel on Python 3.14.9 (the fork's LGPL check + MyDancingBook's allow-list)
+        env:
+          PIP_DISABLE_PIP_VERSION_CHECK: "1"
+          PIP_CONFIG_FILE: "nul"
+        run: |
+          set -euo pipefail
+          TMPU="$(cygpath -u "$RUNNER_TEMP")"
+          VENV="$TMPU/check-venv"
+          "$(cygpath -u '${{ steps.py314.outputs.python-path }}')" -m venv "$VENV"
+          "$VENV/Scripts/python.exe" -m pip install --no-index --no-deps dist/av-*.whl
+          WS="$PWD"
+          cd "$TMPU"
+          echo "[check] scripts/lgpl-check.py"
+          "$VENV/Scripts/python.exe" -I "$WS/scripts/lgpl-check.py"
+          echo "[check] MyDancingBook ffmpeg_allowlist.py --check-pyav"
+          "$VENV/Scripts/python.exe" -I "$WS/scripts/mdb/ffmpeg_allowlist.py" --check-pyav
+          echo "[check] smoke"
+          "$VENV/Scripts/python.exe" -I -c '
+          import os, av
+          v = av.library_versions["libavcodec"]
+          print("av", av.__version__, "| ffmpeg", av.ffmpeg_version_info, "| libavcodec", ".".join(map(str, v)),
+                "| codecs_available", len(av.codecs_available), "| formats_available", len(av.formats_available))
+          print("bundled:", " ".join(sorted(os.listdir(os.path.dirname(av.__file__) + ".libs"))))
+          assert v[:2] >= (63, 1), v
+          assert str(av.ffmpeg_version_info).startswith("9.0.2"), av.ffmpeg_version_info
+          av.AudioResampler(format="s16", layout="mono", rate=16000)
+          print("AudioResampler OK")'
+          cd "$WS/dist"
+          sha256sum av-*.whl | tee -a "$GITHUB_STEP_SUMMARY"
+          ls -l av-*.whl
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          name: dist-windows-AMD64
           path: dist/
+          if-no-files-found: error
 
   publish:
-    runs-on: ubuntu-latest
-    needs: [package-source, package-wheel]
+    needs: package-wheel-windows
+    if: github.ref == 'refs/heads/win-lgpl2'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
     permissions:
       contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
         with:
-          merge-multiple: true
+          name: dist-windows-AMD64
           path: dist/
-      - name: Checksums
-        run: cd dist && sha256sum * > SHA256SUMS && cat SHA256SUMS
 
-      - name: Publish to GitHub
-        if: github.event_name == 'release'
-        uses: softprops/action-gh-release@v1
-        with:
-          files: dist/*
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Checksums
+        run: |
+          set -euo pipefail
+          cd dist
+          ls -l
+          test "$(ls av-*.whl | wc -l)" = "1"
+          sha256sum -- av-*.whl > SHA256SUMS
+          cat SHA256SUMS | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Publish (a new release, or new names only; never deletes, never replaces)
+        run: |
+          set -euo pipefail
+          if existing="$(gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name' 2>/dev/null)"; then
+            echo "release $RELEASE_TAG exists; it has:"; echo "$existing"
+            for f in dist/*; do
+              if grep -qxF -- "$(basename "$f")" <<<"$existing"; then
+                echo "REFUSING: $(basename "$f") is already on $RELEASE_TAG (this workflow never replaces an asset)"
+                exit 1
+              fi
+            done
+            gh release upload "$RELEASE_TAG" dist/*
+          else
+            printf '%s\n' \
+              "PyAV 18.1.0+lgpl2 for Windows x64 (cp311-abi3), MyDancingBook's LGPL-2.1-or-later build." \
+              "" \
+              "FFmpeg 9.0.2 allow-list build: https://github.com/J-Nsky/pyav-ffmpeg/releases/tag/9.0.2-lgpl2" \
+              "(ffmpeg-windows-x86_64.tar.gz, SOURCE-windows-x86_64.txt). Built by workflow run" \
+              "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID from commit $GITHUB_SHA." \
+              "Checksums in SHA256SUMS." > notes.md
+            gh release create "$RELEASE_TAG" --target "$GITHUB_SHA" --title "$RELEASE_TAG" \
+              --notes-file notes.md --latest=false dist/*
+          fi
+          echo "release $RELEASE_TAG now (name, bytes, GitHub digest, uploader):"
+          gh api "repos/$GH_REPO/releases/tags/$RELEASE_TAG" --jq '.assets[] | "\(.name)  \(.size)  \(.digest)  \(.uploader.login)"'

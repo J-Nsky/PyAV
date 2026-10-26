@@ -1,0 +1,5 @@
+# MyDancingBook lgpl2 Windows wheel (RC item G4): delvewheel has no wheel on GitHub, so its
+# PyPI sdist, hash-locked (SHA-256 = conda-forge delvewheel-feedstock recipe 1.13.2), built
+# with the setuptools above:
+#   python -m pip install --require-hashes --no-deps --no-build-isolation --no-binary=delvewheel -r scripts/mdb/build-tools-sdist.txt
+delvewheel==1.13.2 --hash=sha256:e04b40d8186d80d3ef74dc8571b5d15026b7a8858e89312692a2b09fbcc67b0e

@@ -1,9 +1,13 @@
 import argparse
+import hashlib
 import logging
 import json
 import os
 import platform
+import re
 import subprocess
+import sys
+import tarfile
 import time
 
 
@@ -45,6 +49,23 @@ if not os.path.exists(args.destination_dir):
 
 tarball_url = config["url"].replace("{platform}", get_platform())
 
+# MDB lgpl2 (RC item G4, 2026-10-26): every tarball is pinned by SHA-256 in the config
+# file ("sha256": {"<platform>": "<64 hex>"}). No pin for this platform = no download;
+# a cached or downloaded file whose SHA-256 differs is refused before it is unpacked.
+expected = (config.get("sha256") or {}).get(get_platform(), "")
+if not re.fullmatch(r"[0-9a-f]{64}", expected):
+    sys.exit(f"fetch-vendor: no SHA-256 pinned for {get_platform()} in {args.config_file} "
+             f"(found {expected!r}); refusing to download {tarball_url}")
+
+
+def sha256_of(path):
+    digest = hashlib.sha256()
+    with open(path, "rb") as fp:
+        for block in iter(lambda: fp.read(1 << 20), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
 # download tarball
 tarball_name = tarball_url.split("/")[-1]
 tarball_file = os.path.join(args.cache_dir, tarball_name)
@@ -53,11 +74,18 @@ if not os.path.exists(tarball_file):
     if not os.path.exists(args.cache_dir):
         os.mkdir(args.cache_dir)
     subprocess.check_call(
-        ["curl", "--location", "--output", tarball_file, "--silent", tarball_url]
+        ["curl", "--fail", "--location", "--proto", "=https", "--tlsv1.2",
+         "--silent", "--show-error", "--output", tarball_file, tarball_url]
     )
 
+got = sha256_of(tarball_file)
+if got != expected:
+    sys.exit(f"fetch-vendor: {tarball_file} has SHA-256 {got}, the pin is {expected}; refusing to unpack")
+logging.info(f"{tarball_name}: SHA-256 {got} = the pin ({os.path.getsize(tarball_file)} bytes)")
+
 logging.info(f"Extracting {tarball_name}")
-subprocess.check_call(["tar", "-C", args.destination_dir, "-xf", tarball_file])
+with tarfile.open(tarball_file) as tar:
+    tar.extractall(args.destination_dir, filter="data")
 
 # Some tarball members carry pre-1980 mtimes, which the ZIP format (and thus
 # delvewheel's wheel repackaging) cannot represent. Bump any such file to now.
