@@ -2,6 +2,6 @@
     "url": "https://github.com/J-Nsky/pyav-ffmpeg/releases/download/9.0.2-lgpl2/ffmpeg-{platform}.tar.gz",
     "sha256": {
         "manylinux-x86_64": "926015d33ab0a60d1cb68f605bab6954c5c000c151cac8c0dba3d79bb4727214",
-        "windows-x86_64": "FILL-AFTER-THE-PYAV-FFMPEG-RUN"
+        "windows-x86_64": "e4225ac652585097008830250f0c4feeb3e6c87678a4e60a55a120c70d6d1e21"
     }
 }
